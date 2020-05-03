@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+		<head>
+				<meta charset="utf-8" />
+				<title>Gamedev Canvas Workshop</title>
+				<style>
+* { padding: o; margin: 0; }
+canvas {background: #eee; display: block; margin: 0 auto; }
+				</style>
+		</head>
+		<body>
+
+				<canvas id="gameCanvas" width="800" height="600"></canvas>
+
+				<script>
+
+						var canvas = document.getElementById('gameCanvas');
+var ctx = canvas.getContext('2d');
+
+var ballPosX = 400;
+var ballPosY = 300;
+var ballSpeedX = 10;
+var ballSpeedY = 4;
+var ballRadius = 10;
+var gameOverScreen = false;
+var remainingLives = 1;
+var player1Score = 0;
+
+var paddle1X = 400;
+const PADDLE_HEIGHT = 10;
+const PADDLE_WIDTH = 100;
+
+var bricks = [];
+const BRICK_HEIGHT = 35;
+const BRICK_WIDTH = 85;
+const BRICK_SPACING = 10;
+const BRICK_OFFSET_LEFT = 25;
+const BRICK_OFFSET_TOP = 15;
+var num_bricks_x = Math.floor(canvas.width/(BRICK_WIDTH + BRICK_SPACING)); 
+var num_bricks_y = 5; 
+
+// Create brick object array
+for (var i = 0; i < num_bricks_x; i++) {
+		bricks[i] = [];
+		for(var j = 0; j < num_bricks_y; j++) {
+				bricks[i][j] = {x: 0, y: 0, status: 1};
+		}
+}
+
+
+function calculateMousePos(evt) {
+
+		var rect = canvas.getBoundingClientRect();
+		var root = document.documentElement;
+		var mouseX = evt.clientX - rect.left- root.scrollLeft;
+		var mouseY = evt.clientY - rect.top- root.scrollTop;
+		mouseX = Math.min(Math.max(parseInt(mouseX),PADDLE_WIDTH/2),canvas.width-PADDLE_WIDTH/2);
+		mouseY = Math.min(Math.max(parseInt(mouseY),0), canvas.height-PADDLE_HEIGHT/2);
+		return {
+				x:mouseX,
+				y:mouseY
+		};
+}
+
+function handleMouseClick(evt) {
+		if(gameOverScreen) {
+				player1Score = 0;
+				remainingLives = 5;
+				gameOverScreen = false;
+		}
+}
+
+window.onload = function () {
+
+		var framesPerSecond = 30;
+		setInterval(drawObjects, 1000/framesPerSecond);
+
+		canvas.addEventListener('mousemove',
+				function(evt) {
+						if (gameOverScreen) {
+								return;
+						}
+						var mousePos = calculateMousePos(evt);
+						paddle1X = mousePos.x-(PADDLE_WIDTH/2);
+				});
+
+		canvas.addEventListener('mousedown', handleMouseClick);
+
+
+}
+
+function ballReset() {
+
+		ballSpeedX = -ballSpeedX;
+		ballPosX = canvas.width/2;
+		ballPosY = canvas.height/2;
+}
+
+function moveObjects() {
+		if (gameOverScreen) {
+				return;
+		}
+		ballPosX += ballSpeedX;
+		ballPosY += ballSpeedY;
+
+		if(ballPosX + ballSpeedX > canvas.width - ballRadius || ballPosX + ballSpeedX < ballRadius) {
+				ballSpeedX = -ballSpeedX;
+		}
+
+		if(ballPosY + ballSpeedY < ballRadius){
+				ballSpeedY = -ballSpeedY;
+		}
+		if(ballPosY + ballSpeedY > canvas.height - ballRadius) { 
+				//check if ball collides with paddle or falls
+				if(ballPosY + ballSpeedY > canvas.height- (ballRadius + PADDLE_HEIGHT)) {
+						if(ballPosX + ballSpeedX + ballRadius > paddle1X &&
+								ballPosX + ballSpeedX + ballRadius < paddle1X + PADDLE_WIDTH) {
+								ballSpeedY = -ballSpeedY;
+
+								//calculate point of contact and change ball speed (X-axis)
+								var deltaX = ballPosX - (paddle1X + PADDLE_WIDTH/2);
+								ballSpeedX = Math.round(deltaX * 0.35);
+
+						} else {
+								remainingLives--;
+								if (remainingLives <= 0) {
+										gameOverScreen = true;
+								} else {
+										ballReset();
+								}
+						}
+				}
+		}
+}
+
+function drawObjects() {
+		ctx.clearRect(0,0, canvas.width, canvas.heigth);
+		drawBackground(0,0,canvas.width,canvas.height);
+		drawBricks();	
+		drawBall();
+		drawPaddle();
+		collisionDetection();
+		moveObjects();
+		drawScore();
+		if (gameOverScreen) {
+				ctx.font = "20px Arial";
+				ctx.fillText("Game over!", 250,300, 'white');
+				ctx.fillText("Click to restart.", 250, 300);
+		}
+}
+
+
+
+
+function collisionDetection(){
+		for (var i = 0; i<num_bricks_x; i++) {
+				for (var j=0; j<num_bricks_y; j++) {
+						var b = bricks[i][j];
+						if (b.status == 1) {
+								if((ballPosX > b.x) && (ballPosX < b.x + BRICK_WIDTH) &&
+										(ballPosY > b.y) && (ballPosY < b.y + BRICK_HEIGHT)) {
+										ballSpeedY = -ballSpeedY;
+										b.status = 0;
+										player1Score++;
+								}
+						}
+				}
+		}
+}
+
+function drawBackground(leftX,topY, width, height) {
+		ctx.fillStyle = 'black';
+		ctx.fillRect(leftX, topY, width, height);
+}
+
+function drawBall () {
+		ctx.fillStyle ='white';
+		ctx.beginPath();
+		ctx.arc(ballPosX, ballPosY, ballRadius, 0, 2*Math.PI, true);
+		ctx.fill();
+}
+
+function drawPaddle() {
+		ctx.fillStyle = 'white';
+		ctx.fillRect(paddle1X, canvas.height-PADDLE_HEIGHT, PADDLE_WIDTH, PADDLE_HEIGHT);
+}
+
+function drawScore() {
+		ctx.font = "15px Arial";
+		ctx.fillStyle = 'white';
+		ctx.fillText("Lives: " + remainingLives, 15, 500);
+		ctx.fillText("Score: " + player1Score, 15, 550);
+}
+
+
+function drawBricks() {
+		for (var i = 0; i<num_bricks_x; i++) {
+				for (var j=0; j<num_bricks_y; j++) {
+						if(bricks[i][j].status == 1) { 
+								var posX = i*(BRICK_WIDTH + BRICK_SPACING) + BRICK_OFFSET_LEFT;
+								var posY = j*(BRICK_HEIGHT + BRICK_SPACING) + BRICK_OFFSET_TOP;
+								bricks[i][j].x = posX;
+								bricks[i][j].y = posY;
+								ctx.beginPath();
+								ctx.rect(posX, posY, BRICK_WIDTH, BRICK_HEIGHT);
+								ctx.fillStyle = 'blue';
+								ctx.fill()
+								ctx.closePath();
+						}
+				}
+		}
+}
+				</script>
+
+</html>
